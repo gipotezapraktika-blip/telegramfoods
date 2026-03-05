@@ -65,17 +65,20 @@ def webhook():
     try:
         # Parse update
         update_data = request.get_json(force=True)
+        logger.info(f"Received webhook data: {update_data}")
+        
         update = Update.de_json(update_data, bot_app.bot)
+        logger.info(f"Parsed update: {update.update_id}, message: {update.message}")
         
         # Process update in event loop and wait for completion
         future = asyncio.run_coroutine_threadsafe(bot_app.process_update(update), loop)
         future.result(timeout=30)  # Wait up to 30 seconds
         
-        logger.info(f"Processed webhook update: {update.update_id}")
+        logger.info(f"Successfully processed webhook update: {update.update_id}")
         return {'ok': True}
         
     except Exception as e:
-        logger.error(f"Error processing webhook: {type(e).__name__} - {str(e)}")
+        logger.error(f"Error processing webhook: {type(e).__name__} - {str(e)}", exc_info=True)
         return {'ok': False, 'error': str(e)}, 500
 
 

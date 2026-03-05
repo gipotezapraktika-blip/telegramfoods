@@ -9,11 +9,14 @@ logger = logging.getLogger(__name__)
 async def recipe_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle text messages with ingredients"""
     
+    logger.info(f"Received message from user {update.effective_user.id}: {update.message.text}")
+    
     # Get user message
     user_message = update.message.text.strip()
     
     # Validate non-empty message
     if not user_message:
+        logger.info(f"Empty message from user {update.effective_user.id}")
         await update.message.reply_text("Пожалуйста отправь список продуктов.")
         return
     
@@ -21,8 +24,12 @@ async def recipe_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     openai_service: OpenAIService = context.bot_data.get('openai_service')
     
     try:
+        logger.info(f"Generating recipe for user {update.effective_user.id}")
+        
         # Generate recipe
         recipe = await openai_service.generate_recipe(user_message)
+        
+        logger.info(f"Recipe generated for user {update.effective_user.id}")
         
         # Format response
         formatted_recipe = format_recipe(recipe)
@@ -30,10 +37,10 @@ async def recipe_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # Send recipe to user
         await update.message.reply_text(formatted_recipe)
         
-        logger.info(f"Successfully generated recipe for user {update.effective_user.id}")
+        logger.info(f"Successfully sent recipe to user {update.effective_user.id}")
         
     except Exception as e:
-        logger.error(f"Error generating recipe: {type(e).__name__} - {str(e)}")
+        logger.error(f"Error generating recipe for user {update.effective_user.id}: {type(e).__name__} - {str(e)}", exc_info=True)
         await update.message.reply_text("Произошла ошибка при генерации рецепта. Попробуйте ещё раз.")
 
 
