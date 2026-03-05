@@ -22,19 +22,28 @@ app = Flask(__name__)
 # Global bot application
 bot_app = None
 loop = None
+loop_thread = None
+
+
+def run_event_loop(loop):
+    """Run event loop in separate thread"""
+    asyncio.set_event_loop(loop)
+    loop.run_forever()
 
 
 def setup_bot_sync():
     """Initialize and configure the bot application (sync wrapper)"""
-    global bot_app, loop
+    global bot_app, loop, loop_thread
     
     # Validate configuration
     Config.validate()
     logger.info("Configuration validated successfully")
     
-    # Create event loop for this thread
+    # Create event loop and start it in separate thread
     loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+    loop_thread = Thread(target=run_event_loop, args=(loop,), daemon=True)
+    loop_thread.start()
+    logger.info("Event loop started in separate thread")
     
     # Create bot application
     bot_app = Application.builder().token(Config.TELEGRAM_TOKEN).build()
@@ -50,12 +59,16 @@ def setup_bot_sync():
     logger.info("Bot handlers registered successfully")
     
     # Initialize bot
-    loop.run_until_complete(bot_app.initialize())
-    loop.run_until_complete(bot_app.start())
+    future = asyncio.run_coroutine_threadsafe(bot_app.initialize(), loop)
+    future.result()
+    
+    future = asyncio.run_coroutine_threadsafe(bot_app.start(), loop)
+    future.result()
     
     # Set webhook
     if Config.WEBHOOK_URL:
-        loop.run_until_complete(bot_app.bot.set_webhook(url=Config.WEBHOOK_URL))
+        future = asyncio.run_coroutine_threadsafe(bot_app.bot.set_webhook(url=Config.WEBHOOK_URL), loop)
+        future.result()
         logger.info(f"Webhook set to: {Config.WEBHOOK_URL}")
 
 
