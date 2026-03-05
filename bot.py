@@ -1,5 +1,6 @@
 import logging
 import asyncio
+from threading import Thread
 from flask import Flask, request
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
@@ -20,15 +21,20 @@ app = Flask(__name__)
 
 # Global bot application
 bot_app = None
+loop = None
 
 
-async def setup_bot():
-    """Initialize and configure the bot application"""
-    global bot_app
+def setup_bot_sync():
+    """Initialize and configure the bot application (sync wrapper)"""
+    global bot_app, loop
     
     # Validate configuration
     Config.validate()
     logger.info("Configuration validated successfully")
+    
+    # Create event loop for this thread
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
     
     # Create bot application
     bot_app = Application.builder().token(Config.TELEGRAM_TOKEN).build()
@@ -44,15 +50,13 @@ async def setup_bot():
     logger.info("Bot handlers registered successfully")
     
     # Initialize bot
-    await bot_app.initialize()
-    await bot_app.start()
+    loop.run_until_complete(bot_app.initialize())
+    loop.run_until_complete(bot_app.start())
     
     # Set webhook
     if Config.WEBHOOK_URL:
-        await bot_app.bot.set_webhook(url=Config.WEBHOOK_URL)
+        loop.run_until_complete(bot_app.bot.set_webhook(url=Config.WEBHOOK_URL))
         logger.info(f"Webhook set to: {Config.WEBHOOK_URL}")
-    
-    return bot_app
 
 
 @app.route('/webhook', methods=['POST'])
@@ -63,8 +67,8 @@ def webhook():
         update_data = request.get_json(force=True)
         update = Update.de_json(update_data, bot_app.bot)
         
-        # Process update
-        asyncio.run(bot_app.process_update(update))
+        # Process update in event loop
+        asyncio.run_coroutine_threadsafe(bot_app.process_update(update), loop)
         
         logger.info(f"Processed webhook update: {update.update_id}")
         return {'ok': True}
@@ -80,11 +84,17 @@ def health():
     return {'status': 'ok'}
 
 
+@app.route('/', methods=['GET'])
+def index():
+    """Root endpoint"""
+    return {'status': 'Telegram Recipe Bot is running', 'webhook': Config.WEBHOOK_URL}
+
+
 def main():
     """Main entry point"""
     try:
-        # Setup bot
-        asyncio.run(setup_bot())
+        # Setup bot in main thread
+        setup_bot_sync()
         
         # Start Flask server
         port = Config.PORT
