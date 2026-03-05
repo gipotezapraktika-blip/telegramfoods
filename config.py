@@ -1,7 +1,10 @@
 import os
 from dotenv import load_dotenv
+import logging
 
-# Load environment variables from .env file
+logger = logging.getLogger(__name__)
+
+# Load environment variables from .env file (only in development)
 load_dotenv()
 
 
@@ -16,6 +19,12 @@ class Config:
     @classmethod
     def validate(cls):
         """Validate that required environment variables are set"""
+        logger.info(f"Validating configuration...")
+        logger.info(f"TELEGRAM_TOKEN present: {bool(cls.TELEGRAM_TOKEN)}")
+        logger.info(f"OPENAI_API_KEY present: {bool(cls.OPENAI_API_KEY)}")
+        logger.info(f"WEBHOOK_URL: {cls.WEBHOOK_URL}")
+        logger.info(f"PORT: {cls.PORT}")
+        
         if not cls.TELEGRAM_TOKEN:
             raise ValueError("Missing required environment variable: TELEGRAM_TOKEN")
         if not cls.OPENAI_API_KEY:
