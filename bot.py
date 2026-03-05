@@ -67,8 +67,9 @@ def webhook():
         update_data = request.get_json(force=True)
         update = Update.de_json(update_data, bot_app.bot)
         
-        # Process update in event loop
-        asyncio.run_coroutine_threadsafe(bot_app.process_update(update), loop)
+        # Process update in event loop and wait for completion
+        future = asyncio.run_coroutine_threadsafe(bot_app.process_update(update), loop)
+        future.result(timeout=30)  # Wait up to 30 seconds
         
         logger.info(f"Processed webhook update: {update.update_id}")
         return {'ok': True}
